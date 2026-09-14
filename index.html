@@ -31,6 +31,16 @@ input,select{
 }
 input:focus,select:focus{border-color:var(--blue);box-shadow:0 0 0 3px #1976d218}
 .hint{font-size:12px;color:var(--muted);margin-top:5px}
+.location-manage{width:100%;height:42px;margin-top:9px;border:1px solid #c8d9ed;background:#f7fbff;color:var(--blue);border-radius:10px;font-weight:800;cursor:pointer}
+.location-manager{display:none;position:fixed;inset:0;background:#0008;z-index:30;padding:20px}
+.location-panel{max-width:680px;margin:40px auto 0;background:#fff;border-radius:18px;padding:18px;max-height:80vh;overflow:auto}
+.location-panel h3{margin:0 0 12px;font-size:20px}
+.location-add{display:grid;grid-template-columns:1fr 90px;gap:8px;margin-bottom:12px}
+.location-add button{border:0;border-radius:10px;background:var(--blue);color:#fff;font-weight:800}
+.plane-list{display:flex;flex-wrap:wrap;gap:8px}
+.plane-item{display:flex;align-items:center;gap:5px;background:#f3f7fc;border:1px solid var(--line);border-radius:10px;padding:7px 9px}
+.plane-item button{border:0;background:transparent;color:#d72e35;font-weight:800;cursor:pointer;padding:2px 4px}
+.close-manager{width:100%;height:44px;margin-top:15px;border:0;border-radius:10px;background:#eaf1f8;color:var(--text);font-weight:800}
 .actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:5px}
 .btn{border:0;border-radius:13px;height:54px;color:#fff;font-weight:800;font-size:20px;cursor:pointer}
 .in{background:var(--green)} .out{background:var(--red)}
@@ -95,7 +105,8 @@ input:focus,select:focus{border-color:var(--blue);box-shadow:0 0 0 3px #1976d218
       <select id="location">
         <option value="">請選擇儲位</option>
       </select>
-      <div class="hint">例如：1-1、1-2、1-3、2-1……</div>
+      <div class="hint">立體儲位：1～250排，每排1～3層；也可使用自訂平面儲位。</div>
+      <button class="location-manage" onclick="openLocationManager()">⚙️ 管理平面儲位</button>
     </div>
 
     <div class="actions">
@@ -146,6 +157,19 @@ input:focus,select:focus{border-color:var(--blue);box-shadow:0 0 0 3px #1976d218
   <div class="status">目前為「本機測試模式」：資料只保存在這台裝置的瀏覽器。</div>
 </div>
 
+<div class="location-manager" id="locationManager" onclick="if(event.target===this)closeLocationManager()">
+  <div class="location-panel">
+    <h3>⚙️ 平面儲位設定</h3>
+    <div class="hint" style="margin-bottom:10px">可自行新增，例如：水庫區、配膳區、待驗區、暫存區。</div>
+    <div class="location-add">
+      <input id="newPlaneLocation" placeholder="輸入平面儲位名稱" maxlength="30">
+      <button onclick="addPlaneLocation()">＋新增</button>
+    </div>
+    <div id="planeLocationList" class="plane-list"></div>
+    <button class="close-manager" onclick="closeLocationManager()">完成</button>
+  </div>
+</div>
+
 <nav class="bottom">
   <button class="active" onclick="scrollToId('home')">⌂<br>首頁</button>
   <button onclick="scrollToId('search')">🔍<br>庫存查詢</button>
@@ -153,10 +177,84 @@ input:focus,select:focus{border-color:var(--blue);box-shadow:0 0 0 3px #1976d218
 </nav>
 
 <script>
+// 立體儲位：1～250排，每排只有1～3層，共750個儲位。
 const LOCATIONS=[];
-for(let r=1;r<=10;r++){for(let c=1;c<=10;c++)LOCATIONS.push(`${r}-${c}`)}
+for(let r=1;r<=250;r++){for(let level=1;level<=3;level++)LOCATIONS.push(`${r}-${level}`)}
+
+let planeLocations=JSON.parse(localStorage.getItem('inventoryPlaneLocations')||'["水庫區","配膳區"]');
+
 const loc=document.getElementById('location');
-LOCATIONS.forEach(x=>{const o=document.createElement('option');o.value=x;o.textContent=x;loc.appendChild(o)});
+
+function rebuildLocationOptions(selected=""){
+  loc.innerHTML='<option value="">請選擇儲位</option>';
+
+  const rackGroup=document.createElement('optgroup');
+  rackGroup.label='立體儲位（1～250排／每排1～3層）';
+  LOCATIONS.forEach(x=>{
+    const o=document.createElement('option');
+    o.value=x;o.textContent=x;rackGroup.appendChild(o);
+  });
+  loc.appendChild(rackGroup);
+
+  if(planeLocations.length){
+    const planeGroup=document.createElement('optgroup');
+    planeGroup.label='平面儲位（自訂）';
+    planeLocations.forEach(x=>{
+      const o=document.createElement('option');
+      o.value=x;o.textContent=x;planeGroup.appendChild(o);
+    });
+    loc.appendChild(planeGroup);
+  }
+
+  if(selected && [...loc.options].some(o=>o.value===selected)) loc.value=selected;
+}
+
+function savePlaneLocations(){
+  localStorage.setItem('inventoryPlaneLocations',JSON.stringify(planeLocations));
+}
+
+function renderPlaneLocationList(){
+  const box=document.getElementById('planeLocationList');
+  box.innerHTML=planeLocations.length
+    ? planeLocations.map((x,i)=>`<div class="plane-item"><span>${esc(x)}</span><button onclick="deletePlaneLocation(${i})">刪除</button></div>`).join('')
+    : '<div class="empty" style="width:100%">目前沒有自訂平面儲位</div>';
+}
+
+function openLocationManager(){
+  renderPlaneLocationList();
+  document.getElementById('locationManager').style.display='block';
+  document.getElementById('newPlaneLocation').focus();
+}
+
+function closeLocationManager(){
+  document.getElementById('locationManager').style.display='none';
+  rebuildLocationOptions(document.getElementById('location').value);
+}
+
+function addPlaneLocation(){
+  const input=document.getElementById('newPlaneLocation');
+  const name=input.value.trim();
+  if(!name){alert('請輸入平面儲位名稱');return}
+  if(LOCATIONS.includes(name)){alert('這個名稱與立體儲位重複');return}
+  if(planeLocations.includes(name)){alert('這個平面儲位已存在');return}
+  planeLocations.push(name);
+  savePlaneLocations();
+  rebuildLocationOptions(name);
+  renderPlaneLocationList();
+  input.value='';
+  input.focus();
+}
+
+function deletePlaneLocation(index){
+  const name=planeLocations[index];
+  if(!confirm(`確定要刪除「${name}」嗎？\n注意：已經存在的庫存紀錄不會被刪除。`))return;
+  planeLocations.splice(index,1);
+  savePlaneLocations();
+  rebuildLocationOptions();
+  renderPlaneLocationList();
+}
+
+rebuildLocationOptions();
 
 let stock=JSON.parse(localStorage.getItem('inventoryStock')||'{}');
 let logs=JSON.parse(localStorage.getItem('inventoryLogs')||'[]');
@@ -240,11 +338,19 @@ function parseVoice(text){
   let t=text.replace(/之/g,'-').replace(/點/g,'.').replace(/。/g,'').trim().toUpperCase();
   const mat=t.match(/[A-Z]?\d{4,}[A-Z0-9]*/);
   if(mat)document.getElementById('material').value=mat[0];
-  const locm=t.match(/(\d{1,2})\s*-\s*(\d{1,2})/);
-  if(locm)document.getElementById('location').value=locm[1]+'-'+locm[2];
-  else{
+  const locm=t.match(/(\d{1,3})\s*-\s*(\d{1,2})/);
+  if(locm){
+    const rackLoc=locm[1]+'-'+locm[2];
+    if(LOCATIONS.includes(rackLoc))document.getElementById('location').value=rackLoc;
+  }else{
     const zhloc=t.match(/([一二三四五六七八九十兩]+)\s*[-之]\s*([一二三四五六七八九十兩]+)/);
-    if(zhLocValid(zhloc)){document.getElementById('location').value=chineseNumber(zhloc[1])+'-'+chineseNumber(zhloc[2])}
+    if(zhLocValid(zhloc)){
+      const rackLoc=chineseNumber(zhloc[1])+'-'+chineseNumber(zhloc[2]);
+      if(LOCATIONS.includes(rackLoc))document.getElementById('location').value=rackLoc;
+    }else{
+      const plane=planeLocations.find(x=>t.includes(String(x).toUpperCase()));
+      if(plane)document.getElementById('location').value=plane;
+    }
   }
   const q=t.match(/(\d+(?:\.\d+)?)\s*(?:個|件|支|pcs|PC|台|顆|片)?/) || t.match(/([零一二兩三四五六七八九十百千]+)\s*(?:個|件|支|台|顆|片)/);
   if(q){const n=chineseNumber(q[1]);if(n>0)document.getElementById('qty').value=n}
