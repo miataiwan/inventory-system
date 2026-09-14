@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>庫存管理系統</title>
+<style>
+*{box-sizing:border-box}
+:root{
+  --blue:#1976d2;--blue2:#2f8df5;--green:#16a765;--red:#ef3f45;
+  --bg:#f4f8fc;--text:#17345c;--muted:#6f88a8;--line:#dbe8f6;
+}
+body{margin:0;background:var(--bg);font-family:"Noto Sans TC","Microsoft JhengHei",Arial,sans-serif;color:var(--text)}
+button,input,select{font:inherit}
+.app{max-width:680px;margin:auto;background:#fff;min-height:100vh;padding-bottom:86px}
+.header{
+  color:#fff;padding:24px 18px 20px;border-radius:0 0 22px 22px;
+  background:linear-gradient(135deg,var(--blue),var(--blue2));
+}
+.header-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.logo{font-size:25px;font-weight:800;letter-spacing:1px}
+.date{font-size:13px;background:#ffffff22;border:1px solid #ffffff55;padding:8px 11px;border-radius:18px;white-space:nowrap}
+.sub{margin-top:5px;font-size:14px;opacity:.9}
+.card{margin:14px 14px 0;padding:16px;border:1px solid var(--line);border-radius:17px;background:#fff;box-shadow:0 3px 12px #1b5a9910}
+.card-title{font-size:21px;font-weight:800;margin-bottom:15px;display:flex;align-items:center;justify-content:space-between}
+.field{margin-bottom:13px}
+label{display:block;font-weight:700;font-size:15px;margin-bottom:7px}
+input,select{
+ width:100%;height:48px;border:1px solid #c8d9ed;border-radius:12px;padding:0 14px;
+ color:#17345c;background:#fff;outline:none
+}
+input:focus,select:focus{border-color:var(--blue);box-shadow:0 0 0 3px #1976d218}
+.hint{font-size:12px;color:var(--muted);margin-top:5px}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:5px}
+.btn{border:0;border-radius:13px;height:54px;color:#fff;font-weight:800;font-size:20px;cursor:pointer}
+.in{background:var(--green)} .out{background:var(--red)}
+.voice{
+ display:flex;align-items:center;justify-content:space-between;gap:10px;
+ background:#eef7ff;border:1px solid #c8e2ff;border-radius:14px;padding:13px;margin-top:12px
+}
+.voice-info b{display:block;font-size:17px}.voice-info span{font-size:12px;color:var(--muted)}
+.voice-btn{border:1px solid #a8d0fa;background:#fff;color:var(--blue);border-radius:12px;padding:10px 13px;font-weight:800;white-space:nowrap;cursor:pointer}
+.voice-btn.listening{background:#eaf1ff;border-color:var(--blue)}
+.search-box{display:flex;gap:8px}.search-box input{flex:1}.search-box button{width:78px;border:0;border-radius:12px;background:var(--blue);color:#fff;font-weight:700}
+.result{margin-top:10px;background:#f7fbff;border-radius:12px;padding:12px;display:none}
+.stock-table,.log-table{width:100%;border-collapse:collapse;font-size:13px}
+.stock-table th,.stock-table td,.log-table th,.log-table td{padding:9px 6px;border-bottom:1px solid #e7eef7;text-align:left}
+.stock-table th,.log-table th{background:#f3f7fc;font-weight:800}
+.stock-table td.num,.stock-table th.num{text-align:right}
+.badge{display:inline-block;border-radius:12px;padding:4px 8px;color:#fff;font-size:11px;font-weight:700}
+.badge.in{background:var(--green)}.badge.out{background:var(--red)}
+.scroll{overflow-x:auto}
+.empty{color:var(--muted);text-align:center;padding:18px}
+.export{width:100%;height:46px;border:1px solid #a9c9ea;background:#fff;color:var(--blue);border-radius:12px;font-weight:800;margin-top:10px}
+.danger{width:100%;height:40px;border:0;background:#fff0f0;color:#d72e35;border-radius:10px;margin-top:9px}
+.status{font-size:12px;color:var(--muted);text-align:center;margin:12px}
+.bottom{
+ position:fixed;left:50%;bottom:0;transform:translateX(-50%);width:min(680px,100%);
+ height:72px;background:#fff;border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(3,1fr);
+ padding-bottom:env(safe-area-inset-bottom);z-index:10
+}
+.bottom button{border:0;background:#fff;color:#7389a5;font-weight:700}.bottom button.active{color:var(--blue)}
+@media(min-width:681px){.bottom{border-radius:18px 18px 0 0}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="header">
+    <div class="header-top">
+      <div>
+        <div class="logo">📦 庫存管理系統</div>
+        <div class="sub">簡單・快速・準確</div>
+      </div>
+      <div class="date" id="now"></div>
+    </div>
+  </header>
+
+  <section class="card" id="home">
+    <div class="card-title">📝 庫存操作 <span id="operator" style="font-size:13px;font-weight:600;color:#6f88a8">操作人：未設定</span></div>
+
+    <div class="field">
+      <label>物料</label>
+      <input id="material" placeholder="請輸入物料編號" autocomplete="off">
+      <div class="hint">例如：31102F0640209</div>
+    </div>
+
+    <div class="field">
+      <label>數量</label>
+      <input id="qty" type="number" min="0.001" step="any" placeholder="請輸入數量">
+      <div class="hint">例如：100</div>
+    </div>
+
+    <div class="field">
+      <label>儲位</label>
+      <select id="location">
+        <option value="">請選擇儲位</option>
+      </select>
+      <div class="hint">例如：1-1、1-2、1-3、2-1……</div>
+    </div>
+
+    <div class="actions">
+      <button class="btn in" onclick="recordStock('入庫')">⬆ 入庫</button>
+      <button class="btn out" onclick="recordStock('出庫')">⬇ 出庫</button>
+    </div>
+
+    <div class="voice">
+      <div class="voice-info">
+        <b>🎤 語音輸入</b>
+        <span id="voiceStatus">例如：「31102F0640209 一百個放 1-2」</span>
+      </div>
+      <button class="voice-btn" id="voiceBtn" onclick="startVoice()">點擊開始</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-title">🔎 查詢庫存</div>
+    <div class="search-box">
+      <input id="search" placeholder="輸入物料或儲位，例如 31102F0640209">
+      <button onclick="searchStock()">查詢</button>
+    </div>
+    <div id="searchResult" class="result"></div>
+  </section>
+
+  <section class="card">
+    <div class="card-title">📦 目前庫存 <span style="font-size:12px;color:#6f88a8">依物料＋儲位</span></div>
+    <div class="scroll">
+      <table class="stock-table">
+        <thead><tr><th>物料</th><th>儲位</th><th class="num">數量</th></tr></thead>
+        <tbody id="stockBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-title">🕘 最近操作紀錄</div>
+    <div class="scroll">
+      <table class="log-table">
+        <thead><tr><th>時間</th><th>物料</th><th>數量</th><th>儲位</th><th>動作</th></tr></thead>
+        <tbody id="logBody"></tbody>
+      </table>
+    </div>
+    <button class="export" onclick="exportExcel()">📊 匯出 Excel</button>
+    <button class="danger" onclick="clearAll()">清除本機測試資料</button>
+  </section>
+
+  <div class="status">目前為「本機測試模式」：資料只保存在這台裝置的瀏覽器。</div>
+</div>
+
+<nav class="bottom">
+  <button class="active" onclick="scrollToId('home')">⌂<br>首頁</button>
+  <button onclick="scrollToId('search')">🔍<br>庫存查詢</button>
+  <button onclick="scrollToId('logBody')">☷<br>操作紀錄</button>
+</nav>
+
+<script>
+const LOCATIONS=[];
+for(let r=1;r<=10;r++){for(let c=1;c<=10;c++)LOCATIONS.push(`${r}-${c}`)}
+const loc=document.getElementById('location');
+LOCATIONS.forEach(x=>{const o=document.createElement('option');o.value=x;o.textContent=x;loc.appendChild(o)});
+
+let stock=JSON.parse(localStorage.getItem('inventoryStock')||'{}');
+let logs=JSON.parse(localStorage.getItem('inventoryLogs')||'[]');
+
+function save(){localStorage.setItem('inventoryStock',JSON.stringify(stock));localStorage.setItem('inventoryLogs',JSON.stringify(logs))}
+function nowText(){return new Date().toLocaleString('zh-TW',{hour12:false})}
+function fmt(n){return Number.isInteger(n)?String(n):Number(n.toFixed(3)).toString()}
+function key(m,l){return m+'||'+l}
+
+function render(){
+  const rows=Object.entries(stock).filter(([,v])=>Math.abs(v)>0.000001)
+    .sort(([a],[b])=>a.localeCompare(b,'zh-Hant'));
+  document.getElementById('stockBody').innerHTML=rows.length?rows.map(([k,v])=>{
+    const [m,l]=k.split('||');return `<tr><td>${esc(m)}</td><td>${esc(l)}</td><td class="num">${fmt(v)}</td></tr>`
+  }).join(''):`<tr><td colspan="3" class="empty">目前沒有庫存資料</td></tr>`;
+
+  document.getElementById('logBody').innerHTML=logs.slice(0,20).map(x=>
+    `<tr><td>${esc(x.time.slice(5,16))}</td><td>${esc(x.material)}</td><td>${fmt(x.qty)}</td><td>${esc(x.location)}</td><td><span class="badge ${x.action==='入庫'?'in':'out'}">${x.action}</span></td></tr>`
+  ).join('') || `<tr><td colspan="5" class="empty">尚無操作紀錄</td></tr>`;
+  document.getElementById('now').textContent=new Date().toLocaleDateString('zh-TW')+' '+new Date().toLocaleTimeString('zh-TW',{hour12:false}).slice(0,5);
+}
+function recordStock(action){
+  const material=document.getElementById('material').value.trim().toUpperCase();
+  const qty=Number(document.getElementById('qty').value);
+  const location=document.getElementById('location').value;
+  if(!material){alert('請輸入物料');return}
+  if(!qty || qty<=0){alert('請輸入正確數量');return}
+  if(!location){alert('請選擇儲位');return}
+  const k=key(material,location);
+  const old=Number(stock[k]||0);
+  if(action==='出庫' && qty>old){alert(`庫存不足！\n${material} / ${location}\n目前庫存：${fmt(old)}`);return}
+  stock[k]=old+(action==='入庫'?qty:-qty);
+  logs.unshift({time:nowText(),material,qty,location,action});
+  save();render();
+  alert(`✅ ${action}成功\n物料：${material}\n數量：${fmt(qty)}\n儲位：${location}\n目前庫存：${fmt(stock[k])}`);
+  document.getElementById('qty').value='';
+}
+function searchStock(){
+  const q=document.getElementById('search').value.trim().toUpperCase();
+  const box=document.getElementById('searchResult');
+  if(!q){box.style.display='none';return}
+  const rows=Object.entries(stock).filter(([k,v])=>Math.abs(v)>0.000001 && k.toUpperCase().includes(q));
+  const total=rows.reduce((s,[,v])=>s+v,0);
+  box.innerHTML=rows.length
+    ? rows.map(([k,v])=>{const [m,l]=k.split('||');return `<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #e3edf7"><span>${esc(m)} / ${esc(l)}</span><b>${fmt(v)}</b></div>`}).join('')+`<div style="padding-top:10px;font-weight:800">合計：${fmt(total)}</div>`
+    : `<div>查無資料</div>`;
+  box.style.display='block';
+}
+function clearAll(){
+  if(confirm('確定要清除這台裝置上的所有測試資料嗎？')){stock={};logs=[];save();render();alert('已清除')}
+}
+function scrollToId(id){
+  const el=document.getElementById(id);if(el)el.scrollIntoView({behavior:'smooth',block:'start'});
+}
+function esc(s){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+
+function startVoice(){
+  const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SpeechRecognition){alert('這個瀏覽器不支援語音輸入。建議用 Android Chrome 或 iPhone Safari 測試。');return}
+  const rec=new SpeechRecognition();rec.lang='zh-TW';rec.interimResults=false;rec.maxAlternatives=1;
+  const btn=document.getElementById('voiceBtn'),status=document.getElementById('voiceStatus');
+  btn.textContent='🎙️ 聆聽中…';btn.classList.add('listening');status.textContent='請說：「物料 數量 儲位」，例如 31102F0640209 一百個放 1-2';
+  rec.onresult=e=>{const text=e.results[0][0].transcript;status.textContent='辨識：'+text;parseVoice(text)};
+  rec.onerror=e=>{status.textContent='語音辨識失敗，請再試一次';alert('語音辨識失敗：'+e.error)};
+  rec.onend=()=>{btn.textContent='點擊開始';btn.classList.remove('listening')};
+  rec.start();
+}
+function chineseNumber(s){
+  const digit={'零':0,'一':1,'二':2,'兩':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9};
+  if(/^\d+(\.\d+)?$/.test(s))return Number(s);
+  let total=0,section=0,num=0;
+  for(const ch of s){
+    if(digit[ch]!==undefined)num=digit[ch];
+    else if(ch==='十'){section+=num||1;section*=10;num=0}
+    else if(ch==='百'){section+=num||1;section*=100;num=0}
+    else if(ch==='千'){section+=num||1;section*=1000;num=0}
+  }
+  return section+num;
+}
+function parseVoice(text){
+  let t=text.replace(/之/g,'-').replace(/點/g,'.').replace(/。/g,'').trim().toUpperCase();
+  const mat=t.match(/[A-Z]?\d{4,}[A-Z0-9]*/);
+  if(mat)document.getElementById('material').value=mat[0];
+  const locm=t.match(/(\d{1,2})\s*-\s*(\d{1,2})/);
+  if(locm)document.getElementById('location').value=locm[1]+'-'+locm[2];
+  else{
+    const zhloc=t.match(/([一二三四五六七八九十兩]+)\s*[-之]\s*([一二三四五六七八九十兩]+)/);
+    if(zhLocValid(zhloc)){document.getElementById('location').value=chineseNumber(zhloc[1])+'-'+chineseNumber(zhloc[2])}
+  }
+  const q=t.match(/(\d+(?:\.\d+)?)\s*(?:個|件|支|pcs|PC|台|顆|片)?/) || t.match(/([零一二兩三四五六七八九十百千]+)\s*(?:個|件|支|台|顆|片)/);
+  if(q){const n=chineseNumber(q[1]);if(n>0)document.getElementById('qty').value=n}
+  alert('語音已帶入欄位，請確認後按「入庫」或「出庫」。');
+}
+function zhLocValid(m){return m && chineseNumber(m[1])>=1 && chineseNumber(m[2])>=1}
+
+function exportExcel(){
+  const stockRows=Object.entries(stock).filter(([,v])=>Math.abs(v)>0.000001).map(([k,v])=>{
+    const [m,l]=k.split('||');return {物料:m,儲位:l,數量:v}
+  });
+  const logRows=logs.map(x=>({日期時間:x.time,物料:x.material,數量:x.qty,儲位:x.location,動作:x.action}));
+  if(window.XLSX){
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(stockRows),'目前庫存');
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(logRows),'操作紀錄');
+    XLSX.writeFile(wb,'庫存管理_'+new Date().toISOString().slice(0,10)+'.xlsx');
+  }else{
+    const csv=['物料,儲位,數量',...stockRows.map(r=>`${r.物料},${r.儲位},${r.數量}`)].join('\\n');
+    const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\\ufeff'+csv],{type:'text/csv;charset=utf-8'}));a.download='庫存管理.csv';a.click();
+  }
+}
+render();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</body>
+</html>
