@@ -336,8 +336,12 @@ function chineseNumber(s){
 }
 function parseVoice(text){
   let t=text.replace(/之/g,'-').replace(/點/g,'.').replace(/。/g,'').trim().toUpperCase();
-  const mat=t.match(/[A-Z]?\d{4,}[A-Z0-9]*/);
+
+  // 先找物料：物料內的數字（例如 T3632000W）不能被當成數量
+  const mat=t.match(/[A-Z][A-Z0-9]*\d[A-Z0-9]*|\d{4,}[A-Z0-9]*/);
   if(mat)document.getElementById('material').value=mat[0];
+
+  // 儲位：先找 1-1～250-3，再找自訂平面儲位
   const locm=t.match(/(\d{1,3})\s*-\s*(\d{1,2})/);
   if(locm){
     const rackLoc=locm[1]+'-'+locm[2];
@@ -352,8 +356,17 @@ function parseVoice(text){
       if(plane)document.getElementById('location').value=plane;
     }
   }
-  const q=t.match(/(\d+(?:\.\d+)?)\s*(?:個|件|支|pcs|PC|台|顆|片)?/) || t.match(/([零一二兩三四五六七八九十百千]+)\s*(?:個|件|支|台|顆|片)/);
-  if(q){const n=chineseNumber(q[1]);if(n>0)document.getElementById('qty').value=n}
+
+  // 數量：優先抓「入庫/出庫/數量」後面的數字，避免把 T3632000W 的數字抓成數量
+  // 支援：入庫3、入庫3個、入庫 3 個、出庫3、出庫3個、數量3、數量三個
+  const qtyAfterAction=t.match(/(?:入庫|出庫|數量)\s*([0-9]+(?:\.[0-9]+)?|[零一二兩三四五六七八九十百千]+)\s*(?:個|件|支|PCS|PC|台|顆|片)?/);
+  const qtyWithUnit=t.match(/([0-9]+(?:\.[0-9]+)?|[零一二兩三四五六七八九十百千]+)\s*(?:個|件|支|PCS|PC|台|顆|片)/);
+  const q=qtyAfterAction || qtyWithUnit;
+  if(q){
+    const n=chineseNumber(q[1]);
+    if(n>0)document.getElementById('qty').value=n;
+  }
+
   alert('語音已帶入欄位，請確認後按「入庫」或「出庫」。');
 }
 function zhLocValid(m){return m && chineseNumber(m[1])>=1 && chineseNumber(m[2])>=1}
