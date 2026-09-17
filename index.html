@@ -151,6 +151,8 @@ input:focus,select:focus{border-color:var(--blue);box-shadow:0 0 0 3px #1976d218
       </table>
     </div>
     <button class="export" onclick="exportExcel()">📊 匯出 Excel</button>
+    <button class="export" onclick="document.getElementById('importFile').click()">📥 匯入 Excel（覆蓋）</button>
+    <input id="importFile" type="file" accept=".xlsx,.xls" style="display:none" onchange="importExcel(this)">
     <button class="danger" onclick="clearAll()">清除本機測試資料</button>
   </section>
 
@@ -335,10 +337,10 @@ function chineseNumber(s){
   return section+num;
 }
 function parseVoice(text){
-  // 語音辨識有時會把第一個英文字母拆開、加空格，或把 T 聽成「梯／提／踢」
+  // 語音辨識可能把英數拆開、把 T 聽成「梯／提／踢」，也可能把「儲格」聽成「儲隔」。
   let t=text.replace(/之/g,'-').replace(/點/g,'.').replace(/。/g,'').trim().toUpperCase();
 
-  // 常見英文字母語音辨識修正（尤其是物料第一碼）
+  // 常見英文字母語音辨識修正
   t=t.replace(/(?:梯|提|踢|T字|T呢)/g,'T')
      .replace(/(?:艾|ㄟ|A字)/g,'A')
      .replace(/(?:比|B字)/g,'B')
@@ -359,6 +361,7 @@ function parseVoice(text){
      .replace(/(?:Q字)/g,'Q')
      .replace(/(?:阿|R字)/g,'R')
      .replace(/(?:艾斯|S字)/g,'S')
+     .replace(/(?:踢字|T字)/g,'T')
      .replace(/(?:U字)/g,'U')
      .replace(/(?:V字)/g,'V')
      .replace(/(?:W字)/g,'W')
@@ -366,31 +369,39 @@ function parseVoice(text){
      .replace(/(?:Y字)/g,'Y')
      .replace(/(?:Z字)/g,'Z');
 
-  // 把「T 3632000 W」這種被語音拆開的物料重新接起來
-  t=t.replace(/([A-Z])\s+(?=\d)/g,'$1').replace(/(?<=\d)\s+(?=[A-Z]) /g,'');
-  t=t.replace(/(?<=\d)\s+(?=[A-Z])/g,'');
+  // 把「T 456 Q 1 R 1」→「T456Q1R1」；只合併英數字之間的空白。
+  t=t.replace(/([A-Z0-9])\s+(?=[A-Z0-9])/g,'$1');
 
-  // 物料：支援 T3632000W，也支援語音拆成 T 3632000 W
-  const mat=t.match(/[A-Z][A-Z0-9]*\d[A-Z0-9]*|\d{4,}[A-Z0-9]*/);
-  if(mat)document.getElementById('material').value=mat[0];
+  // 物料：英數混合皆可，不再要求一定要有數字。
+  // 先取「入庫／出庫／數量」之前的英數字串，避免把數量或儲位抓成物料。
+  const beforeAction=t.split(/(?:入庫|出庫|數量)/)[0];
+  const matMatches=beforeAction.match(/[A-Z0-9]+/g);
+  if(matMatches && matMatches.length){
+    // 優先取含英文字母的字串；若語音只辨識出數字，也取最長的一段。
+    const mat=matMatches.filter(x=>/[A-Z]/.test(x)).sort((a,b)=>b.length-a.length)[0] || matMatches.sort((a,b)=>b.length-a.length)[0];
+    if(mat)document.getElementById('material').value=mat;
+  }
 
-  // 儲位：先找 1-1～250-3，再找自訂平面儲位
-  const locm=t.match(/(\d{1,3})\s*-\s*(\d{1,2})/);
+  // 儲位：支援 1-1、150-1、250-3，也支援「15之1」「150之1」。
+  // 「儲隔」是語音把「儲格」聽錯，這裡不需要特別判斷，只要抓後面的數字即可。
+  const locm=t.match(/(?:儲格|儲隔|儲位)?\s*(\d{1,3})\s*[-之]\s*(\d{1,2})/);
   if(locm){
-    const rackLoc=locm[1]+'-'+locm[2];
-    if(LOCATIONS.includes(rackLoc))document.getElementById('location').value=rackLoc;
+    const row=Number(locm[1]),level=Number(locm[2]);
+    if(row>=1 && row<=250 && level>=1 && level<=3){
+      document.getElementById('location').value=row+'-'+level;
+    }
   }else{
-    const zhloc=t.match(/([一二三四五六七八九十兩]+)\s*[-之]\s*([一二三四五六七八九十兩]+)/);
+    const zhloc=t.match(/(?:儲格|儲隔|儲位)?\s*([一二三四五六七八九十兩百]+)\s*[-之]\s*([一二三四五六七八九十兩三百]+)/);
     if(zhLocValid(zhloc)){
-      const rackLoc=chineseNumber(zhloc[1])+'-'+chineseNumber(zhloc[2]);
-      if(LOCATIONS.includes(rackLoc))document.getElementById('location').value=rackLoc;
+      const row=chineseNumber(zhloc[1]),level=chineseNumber(zhloc[2]);
+      if(row>=1 && row<=250 && level>=1 && level<=3)document.getElementById('location').value=row+'-'+level;
     }else{
       const plane=planeLocations.find(x=>t.includes(String(x).toUpperCase()));
       if(plane)document.getElementById('location').value=plane;
     }
   }
 
-  // 數量：只抓「入庫／出庫／數量」後面的數字，絕不抓物料內的數字
+  // 數量：只抓「入庫／出庫／數量」後面的數字，絕不抓物料內的數字。
   const qtyAfterAction=t.match(/(?:入庫|出庫|數量)\s*([0-9]+(?:\.[0-9]+)?|[零一二兩三四五六七八九十百千]+)\s*(?:個|件|支|PCS|PC|台|顆|片)?/);
   const qtyWithUnit=t.match(/([0-9]+(?:\.[0-9]+)?|[零一二兩三四五六七八九十百千]+)\s*(?:個|件|支|PCS|PC|台|顆|片)/);
   const q=qtyAfterAction || qtyWithUnit;
@@ -409,16 +420,82 @@ function exportExcel(){
     const [m,l]=k.split('||');return {物料:m,儲位:l,數量:v}
   });
   const logRows=logs.map(x=>({日期時間:x.time,物料:x.material,數量:x.qty,儲位:x.location,動作:x.action}));
+  const planeRows=planeLocations.map(x=>({平面儲位:x}));
   if(window.XLSX){
     const wb=XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(stockRows),'目前庫存');
     XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(logRows),'操作紀錄');
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(planeRows),'平面儲位');
     XLSX.writeFile(wb,'庫存管理_'+new Date().toISOString().slice(0,10)+'.xlsx');
   }else{
-    const csv=['物料,儲位,數量',...stockRows.map(r=>`${r.物料},${r.儲位},${r.數量}`)].join('\\n');
-    const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\\ufeff'+csv],{type:'text/csv;charset=utf-8'}));a.download='庫存管理.csv';a.click();
+    const csv=['物料,儲位,數量',...stockRows.map(r=>`${r.物料},${r.儲位},${r.數量}`)].join('\n');
+    const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}));a.download='庫存管理.csv';a.click();
   }
 }
+
+async function importExcel(input){
+  const file=input.files && input.files[0];
+  if(!file)return;
+  if(!window.XLSX){alert('Excel 元件尚未載入，請確認網路連線後再試一次。');input.value='';return}
+
+  if(!confirm('⚠️ 匯入 Excel 會「覆蓋」這台裝置目前的庫存與操作紀錄。\n\n確定要繼續嗎？')){input.value='';return}
+
+  try{
+    const data=await file.arrayBuffer();
+    const wb=XLSX.read(data,{type:'array'});
+
+    // 讀取「目前庫存」
+    const stockSheet=wb.Sheets['目前庫存'] || wb.Sheets[wb.SheetNames[0]];
+    if(!stockSheet)throw new Error('找不到庫存工作表');
+    const stockRows=XLSX.utils.sheet_to_json(stockSheet,{defval:''});
+    const newStock={};
+    for(const row of stockRows){
+      const material=String(row['物料']??'').trim().toUpperCase();
+      const location=String(row['儲位']??'').trim();
+      const qty=Number(row['數量']);
+      if(material && location && Number.isFinite(qty))newStock[key(material,location)]=qty;
+    }
+
+    // 讀取「操作紀錄」；如果 Excel 沒有這張表，就讓紀錄保持空白。
+    let newLogs=[];
+    const logSheet=wb.Sheets['操作紀錄'];
+    if(logSheet){
+      const logRows=XLSX.utils.sheet_to_json(logSheet,{defval:''});
+      newLogs=logRows.map(row=>({
+        time:String(row['日期時間']??'').trim(),
+        material:String(row['物料']??'').trim().toUpperCase(),
+        qty:Number(row['數量']),
+        location:String(row['儲位']??'').trim(),
+        action:String(row['動作']??'').trim()
+      })).filter(x=>x.time && x.material && x.location && Number.isFinite(x.qty) && (x.action==='入庫'||x.action==='出庫'));
+    }
+
+    // 匯入「平面儲位」，讓自訂儲位也可以跟著 Excel 一起還原。
+    let newPlaneLocations=planeLocations;
+    const planeSheet=wb.Sheets['平面儲位'];
+    if(planeSheet){
+      const planeRows=XLSX.utils.sheet_to_json(planeSheet,{defval:''});
+      newPlaneLocations=planeRows.map(row=>String(row['平面儲位']??'').trim()).filter(x=>x && !LOCATIONS.includes(x));
+      newPlaneLocations=[...new Set(newPlaneLocations)];
+    }
+
+    stock=newStock;
+    logs=newLogs;
+    planeLocations=newPlaneLocations;
+    savePlaneLocations();
+    save();
+    rebuildLocationOptions();
+    renderPlaneLocationList();
+    render();
+    alert(`✅ 匯入完成！\n\n目前庫存：${Object.keys(stock).length} 筆\n操作紀錄：${logs.length} 筆\n平面儲位：${planeLocations.length} 個`);
+  }catch(err){
+    console.error(err);
+    alert('❌ 匯入失敗！\n\n請使用本系統「匯出 Excel」產生的檔案，或確認欄位名稱為：\n物料、儲位、數量\n\n錯誤：'+err.message);
+  }finally{
+    input.value='';
+  }
+}
+
 render();
 </script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
