@@ -66,7 +66,7 @@ input:focus,select:focus{border-color:var(--blue);box-shadow:0 0 0 3px #1976d218
 .status{font-size:12px;color:var(--muted);text-align:center;margin:12px}
 .bottom{
  position:fixed;left:50%;bottom:0;transform:translateX(-50%);width:min(680px,100%);
- height:72px;background:#fff;border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(3,1fr);
+ height:72px;background:#fff;border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(4,1fr);
  padding-bottom:env(safe-area-inset-bottom);z-index:10
 }
 .bottom button{border:0;background:#fff;color:#7389a5;font-weight:700}.bottom button.active{color:var(--blue)}
@@ -150,10 +150,15 @@ input:focus,select:focus{border-color:var(--blue);box-shadow:0 0 0 3px #1976d218
         <tbody id="logBody"></tbody>
       </table>
     </div>
+  </section>
+
+  <section class="card" id="fileData">
+    <div class="card-title">📁 檔案資料</div>
+    <div class="hint" style="margin-bottom:12px">可將目前資料匯出成 Excel，或用之前匯出的 Excel 覆蓋還原。清除資料只會清除這台裝置的本機測試資料。</div>
     <button class="export" onclick="exportExcel()">📊 匯出 Excel</button>
     <button class="export" onclick="document.getElementById('importFile').click()">📥 匯入 Excel（覆蓋）</button>
     <input id="importFile" type="file" accept=".xlsx,.xls" style="display:none" onchange="importExcel(this)">
-    <button class="danger" onclick="clearAll()">清除本機測試資料</button>
+    <button class="danger" onclick="clearAll()">🗑️ 清除本機測試資料</button>
   </section>
 
   <div class="status">目前為「本機測試模式」：資料只保存在這台裝置的瀏覽器。</div>
@@ -176,6 +181,7 @@ input:focus,select:focus{border-color:var(--blue);box-shadow:0 0 0 3px #1976d218
   <button class="active" onclick="scrollToId('home')">⌂<br>首頁</button>
   <button onclick="scrollToId('search')">🔍<br>庫存查詢</button>
   <button onclick="scrollToId('logBody')">☷<br>操作紀錄</button>
+  <button onclick="scrollToId('fileData')">📁<br>檔案資料</button>
 </nav>
 
 <script>
