@@ -402,24 +402,18 @@ function parseVoice(text){
   // 儲位：
   // 數字：25-1、150-1、152-1
   // 中文：二十五之1、三十五之1、一百五十二之1、一百五十之1
-  const locm=t.match(/(?:儲格|儲隔|儲位)?\s*(\d{1,3})\s*[-]\s*(\d{1,2})/);
+  // 儲位可混合阿拉伯數字與中文數字，例如：34-3、34-三、二十五-1、二十五-一。
+  // 不要求一定要說「儲格／儲隔／儲位」，只要出現「列-層」就辨識。
+  const numOrZh='(?:\d{1,3}|[零一二兩三四五六七八九十百千]+)';
+  const locm=t.match(new RegExp('(?:儲格|儲隔|儲位)?\\s*('+numOrZh+')\\s*[-]\\s*('+numOrZh+')'));
   if(locm){
-    const row=Number(locm[1]),level=Number(locm[2]);
+    const row=chineseNumber(locm[1]),level=chineseNumber(locm[2]);
     if(row>=1 && row<=250 && level>=1 && level<=3){
       document.getElementById('location').value=row+'-'+level;
     }
   }else{
-    const zhloc=t.match(/(?:儲格|儲隔|儲位)?\s*([零一二兩三四五六七八九十百千]+)\s*[-]\s*([零一二兩三四五六七八九十百千]+|\d{1,2})/);
-    if(zhloc){
-      const row=chineseNumber(zhloc[1]);
-      const level=chineseNumber(zhloc[2]);
-      if(row>=1 && row<=250 && level>=1 && level<=3){
-        document.getElementById('location').value=row+'-'+level;
-      }
-    }else{
-      const plane=planeLocations.find(x=>t.includes(String(x).toUpperCase()));
-      if(plane)document.getElementById('location').value=plane;
-    }
+    const plane=planeLocations.find(x=>t.includes(String(x).toUpperCase()));
+    if(plane)document.getElementById('location').value=plane;
   }
 
   // 數量：只抓「入庫／出庫／數量」後面的數字。
